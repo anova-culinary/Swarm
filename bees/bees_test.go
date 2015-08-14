@@ -1,55 +1,66 @@
 package bees_test
 
 import (
-	"fmt"
-	"net"
+	"sync"
 
-	bees "github.com/anova/tcp-bees/bees"
-
-	"os"
-
+	"github.com/anova/swarm/bees"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func handleConnection(conn net.Conn) {
+// func handleConnection(conn net.Conn) {
 
+// }
+
+// func AcceptLoop(ln *Listener, acceptanceTestFunc func(string) bool) {
+// 	for {
+// 		conn, err := ln.Accept()
+// 		if err != nil {
+// 			fmt.Printf("Error in Accept Loop %v\n", err)
+// 		}
+// 		go handleConnection(conn)
+// 	}
+// }
+
+var swarm []*MockBee
+
+func NewMockBee() bees.Bee {
+	bee := &MockBee{}
+	swarm = append(swarm, bee)
+	return bee
 }
 
-func AcceptLoop() {
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			// handle error
-		}
-		go handleConnection(conn)
-	}
+type MockBee struct {
+	StingCalled bool
+}
+
+func (mockBee *MockBee) Sting(addr string, id int, wg *sync.WaitGroup) {
+	mockBee.StingCalled = true
+
+	wg.Done()
 }
 
 var _ = Describe("The load tester", func() {
-	var conn net.Conn
-	BeforeSuite(func() {
-		conn, err = net.Listen("tcp", ":3000")
-		if err != nil {
-			fmt.Printf("Error in BeforeSuite: %v\n", err)
-		}
 
-		go AcceptLoop(func(result string) {
-			response = result
-		})
-
+	var hive *bees.Hive
+	BeforeEach(func() {
+		hive = bees.NewHive()
 	})
 
 	It("initializes a hive", func() {
-		hive := bees.NewHive()
 
 		Expect(hive).ToNot(BeNil())
 	})
 
-	It("connects to the ip address defined in args", func() {
-		os.Args = []string{"", "1", "127.0.0.1:3000"}
+	It("spawns up a wave of killer bees", func() {
+		hive.ReleaseTheBees(NewMockBee, "127.0.0.1", 10)
 
-		hive.ReleaseTheBees()
-		Expect(result).To(Equal("Hi 1"))
+		allBeesStung := true
+		for _, bee := range swarm {
+			allBeesStung = allBeesStung && bee.StingCalled
+		}
+
+		Expect(allBeesStung).To(BeTrue())
 	})
+
 })
